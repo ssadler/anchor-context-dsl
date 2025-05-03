@@ -76,13 +76,12 @@ define_prop_parser!(NoInit, parse_indented);
 
 
 impl<L: IndentLevel, Set: DispatchParseIndented> ParseIndented<L> for DynStruct<Set>
-    where Dyn<Set>: Clone {
+    where DynProp<Set>: Clone {
     fn parse_indented(input: parse::ParseStream) -> Result<Self> {
         let mut props = DynStruct::<Set>::default();
 
         parse_many_indented_fn::<L::Next>(input, || {
-            let o: DynProp<Set> = parse_indented::<L::Next, _>(input)?;
-            props.insert_dyn(o.label, o.value);
+            props.insert_dyn(parse_indented::<L::Next, _>(input)?);
             Ok(())
         })?;
 

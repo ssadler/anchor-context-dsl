@@ -38,20 +38,25 @@ fn expand_account(
     let mut depends = HashSet::<syn::Ident>::new();
     let init = args.iter().any(|a| a == "init");
 
-    let props = account.iter().cloned().map(|prop| {
-        match prop {
-            AccountProp::Depends(ids) => {
-                depends.extend(ids.clone());
-                None
-            },
-            AccountProp::Type(s) => Some(ExpandedAccountProp::Type(s)),
-            AccountProp::Mut(m) => Some(ExpandedAccountProp::Mut(m)),
-            AccountProp::Struct(s) => Some(ExpandedAccountProp::Struct(s)),
-            AccountProp::Constraints(c) => Some(ExpandedAccountProp::Constraints(c)),
-            _ => panic!("")
+    type It = ParseAccountPropsItem;
+
+    let mut out: DynStruct<RealAccountProps> = Default::default();
+
+    account.iter().map(|prop| {
+        match prop.1 {
+            ParseAccountPropsItem::Constraints(constraints) => todo!(),
+            ParseAccountPropsItem::Mut(_) => todo!(),
+            ParseAccountPropsItem::Struct(_) => todo!(),
+            ParseAccountPropsItem::Seeds(seeds) => todo!(),
+            ParseAccountPropsItem::TokenMint(token_mint) => todo!(),
+            ParseAccountPropsItem::TokenAuthority(token_authority) => todo!(),
+            ParseAccountPropsItem::AccountType(account_type) => todo!(),
+            ParseAccountPropsItem::Depends(depends) => todo!(),
+            ParseAccountPropsItem::Init(init) => todo!(),
+            ParseAccountPropsItem::NoInit(no_init) => todo!(),
         }
     });
     
 
-    Ok(vec![])
+    Ok(Default::default())
 }
