@@ -1,0 +1,10 @@
+#![feature(prelude_import)]
+#![allow(unexpected_cfgs)]
+#[prelude_import]
+use std::prelude::rust_2024::*;
+#[macro_use]
+extern crate std;
+pub use anchor_lang::system_program::ID;
+pub use anchor_lang;
+use anchor_yaml_accounts::*;
+use anchor_lang::prelude::*;
