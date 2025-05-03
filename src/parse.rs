@@ -8,7 +8,7 @@ use crate::propsets::*;
 
 impl parse::Parse for YamlDoc {
     fn parse(input: parse::ParseStream) -> Result<Self> {
-        let mut accounts = KeyedVec::<DynStruct::<ParseAccountProps>>::default();
+        let mut accounts = KeyedVec::<DynStruct::<ParseAccountProps>>::new();
         let mut contexts = KeyedVec::<Vec<ContextProp>>::default();
 
 
@@ -75,10 +75,9 @@ define_prop_parser!(Init, parse_indented);
 define_prop_parser!(NoInit, parse_indented);
 
 
-impl<L: IndentLevel, Set: DispatchParseIndented> ParseIndented<L> for DynStruct<Set>
-    where DynProp<Set>: Clone {
+impl<L: IndentLevel, Set: DispatchParseIndented> ParseIndented<L> for DynStruct<Set> {
     fn parse_indented(input: parse::ParseStream) -> Result<Self> {
-        let mut props = DynStruct::<Set>::default();
+        let mut props = DynStruct::<Set>::new();
 
         parse_many_indented_fn::<L::Next>(input, || {
             props.insert_dyn(parse_indented::<L::Next, _>(input)?);
@@ -93,24 +92,24 @@ impl<L: IndentLevel, Set: DispatchParseIndented> ParseIndented<L> for DynStruct<
 
 
 trait DispatchParseIndented: PropSet {
-    fn dispatch<L: IndentLevel>(label: &str, input: parse::ParseStream) -> Result<DynProp<Self>>;
+    fn dispatch<L: IndentLevel>(label: &str, input: parse::ParseStream) -> Result<Self>;
 }
 impl DispatchParseIndented for ParseAccountProps {
-    fn dispatch<L: IndentLevel>(label: &str, input: parse::ParseStream) -> Result<DynProp<Self>> {
+    fn dispatch<L: IndentLevel>(label: &str, input: parse::ParseStream) -> Result<Self> {
         impl_prop_dispatch_ParseAccountProps!(label, |T| {
-            <T as ParseIndented<L>>::parse_indented(input).map(|r| r.to_dyn())
+            <T as ParseIndented<L>>::parse_indented(input).map(|s| s.into())
         }, Err(parse_error!(input.span(), "invalid property")))
     }
 }
 impl DispatchParseIndented for RealAccountPropsSansInit {
-    fn dispatch<L: IndentLevel>(label: &str, input: parse::ParseStream) -> Result<DynProp<Self>> {
+    fn dispatch<L: IndentLevel>(label: &str, input: parse::ParseStream) -> Result<Self> {
         impl_prop_dispatch_RealAccountPropsSansInit!(label, |T| {
-            <T as ParseIndented<L>>::parse_indented(input).map(|r| r.to_dyn())
+            <T as ParseIndented<L>>::parse_indented(input).map(|r| r.into())
         }, Err(parse_error!(input.span(), "invalid property")))
     }
 }
 
-impl<L: IndentLevel, Set: DispatchParseIndented> ParseIndented<L> for DynProp<Set> {
+impl<L: IndentLevel, Set: DispatchParseIndented> ParseIndented<L> for Set {
     fn parse_indented(input: parse::ParseStream) -> Result<Self> {
         let PropLabel(label) = input.fork().parse()?;
         if !Set::has_prop(label) {

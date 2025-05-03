@@ -53,6 +53,7 @@ pub enum ContextProp {
 #[derive(Debug, Default)]
 pub struct KeyedVec<T>(pub Vec<(Ident, T)>);
 impl<T> KeyedVec<T> {
+    pub fn new() -> Self { KeyedVec(vec![]) }
     pub fn has(&self, id: &Ident) -> bool {
         self.0.iter().any(|(i,_)| i == id)
     }
