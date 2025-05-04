@@ -1,22 +1,23 @@
 
 mod indented;
-mod types;
-mod expand;
-mod parse;
 mod propsets;
+mod types;
+mod parse;
+mod build;
+mod compile;
 
-use syn::*;
-use quote::*;
+use build::build_contexts;
 use indented::*;
 use types::*;
+use compile::compile;
 
 
 #[proc_macro]
 pub fn yaml_contexts(tokens: proc_macro::TokenStream) -> proc_macro::TokenStream {
-
-    //panic!("{:?}", tokens);
-    let indented = create_indented_tokenstream(tokens);
+    let indented = match create_indented_tokenstream(tokens) {
+        Some(i) => i,
+        None => return Default::default()
+    };
     let doc = syn::parse_macro_input!(indented as YamlDoc);
-    //panic!("{:?}", doc);
-    Default::default()
+    build_contexts(&doc).map(compile).unwrap_or_else(syn::Error::into_compile_error).into()
 }

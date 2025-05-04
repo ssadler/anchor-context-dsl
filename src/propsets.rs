@@ -1,6 +1,18 @@
 
 use std::{collections::HashMap, fmt::Debug};
 
+
+pub trait PropSet_: Clone + Debug {
+    type Key;
+    const PROPS: &[&str];
+    fn has_prop(label: &str) -> bool;
+    fn key(&self) -> Self::Key;
+}
+pub struct DynStruct_<Set: PropSet_>(HashMap<Set::Key, Set>);
+
+
+
+
 #[derive(Debug, Clone)]
 pub struct DynStruct<Set: PropSet>(HashMap<&'static str, Set>);
 impl<Set: PropSet> DynStruct<Set> {
@@ -20,16 +32,24 @@ impl<Set: PropSet> DynStruct<Set> {
     pub fn iter(&self) -> impl Iterator<Item=(&str, Set)> {
         self.0.clone().into_iter().map(|(k, v)| { (k, v) })
     }
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn remove<P: PropOf<Set>>(&mut self) -> Option<P> {
+        self.0.remove(P::LABEL).map(P::downcast)
+    }
+    pub fn keys(&self) -> impl Iterator<Item=&str> {
+        self.0.keys().cloned()
+    }
 }
 
 
 pub trait IsDynProp {
-    type TYPE: 'static + Clone;
     const LABEL: &'static str;
 }
 
 
-pub trait PropSet: Clone {
+pub trait PropSet: Clone + Debug {
     const PROPS: &[&str];
     fn has_prop(label: &str) -> bool;
     fn label(&self) -> &'static str;
@@ -45,11 +65,17 @@ macro_rules! define_prop {
         #[derive(Debug, Clone)]
         pub struct $struct_name(pub $type);
         impl IsDynProp for $struct_name {
-            type TYPE = $type;
             const LABEL: &'static str = $label;
         }
         impl $struct_name {
+            #[allow(dead_code)]
             pub fn unwrap(self) -> $type { self.0 }
+        }
+        impl std::ops::Deref for $struct_name {
+            type Target = $type;
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
         }
     };
 }
@@ -82,9 +108,7 @@ macro_rules! define_prop_set {
         }
 
         $(impl Into<$set> for $prop {
-            fn into(self) -> $set {
-                $set::$prop(self)
-            }
+            fn into(self) -> $set { $set::$prop(self) }
         })*
 
         paste::paste! {
@@ -96,6 +120,43 @@ macro_rules! define_prop_set {
             }
             #[allow(unused_imports)]
             pub(crate) use [<impl_prop_dispatch_ $set>];
+
+            #[allow(unused_macros)]
+            macro_rules! [<match_case_ $set>] {
+                ($input:expr, $set2:ident, $o:pat => $rest:tt, $D($arms:tt)*) => {
+                    match $input {
+                        $($set2::$prop($o) => $rest,)*
+                        $D($arms)*
+                    }
+                }
+            }
+            #[allow(unused_imports)]
+            pub(crate) use [<match_case_ $set>];
+
+
+            #[allow(unused_macros)]
+            macro_rules! [<extend_set_ $set>] {
+                ($set2:ident, $D($prop2:ident),+) => {
+                    define_prop_set!($set2 $(,$prop)* $D(,$prop2)*);
+                    impl Into<$set2> for $set {
+                        fn into(self) -> $set2 {
+                            match self {
+                                $($set::$prop(o) => $set2::$prop(o)),*
+                            }
+                        }
+                    }
+                    impl TryInto<$set> for $set2 {
+                        type Error = ();
+                        fn try_into(self) -> std::result::Result<$set, Self::Error> {
+                            match self {
+                                $($set2::$prop(o) => Ok($set::$prop(o)),)*
+                                _ => Err(())
+                            }
+                        }
+                    }
+                };
+            }
+
         }
     };
 }

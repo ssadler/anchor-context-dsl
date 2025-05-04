@@ -10,4 +10,5 @@ no-entrypoint = []
 
 [dependencies]
 anchor-lang = "0.31.1"
+anchor-spl = "0.31.1"
 anchor-yaml-accounts = { path = "../.." }
