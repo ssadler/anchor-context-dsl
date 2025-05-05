@@ -1,7 +1,7 @@
 
 use std::collections::HashMap;
 use syn::*;
-use crate::{propsets::DynStruct, types::*};
+use crate::{programs::add_programs_to_context, propsets::DynStruct, types::*};
 
 
 
@@ -12,7 +12,7 @@ pub fn build_contexts(YamlDoc(YamlContexts(contexts), accounts): &YamlDoc) -> Re
     }).collect::<Result<_>>().map(BuiltContexts)
 }
 
-type ContextDependencies = HashMap<Ident, Vec<Ident>>;
+type ContextDependencies = HashMap<Ident, Vec<AccountArg>>;
 
 fn build_context(
     props: &Vec<ContextProp>,
@@ -42,37 +42,55 @@ fn build_context(
         break;
     };
 
+    add_programs_to_context(&mut accounts);
+
     Ok(BuiltContext { accounts, instruction })
 }
 
 
 fn build_account(
     account: &DynStruct<ParseAccountProps>,
-    args: Vec<syn::Ident>,
+    args: Vec<AccountArg>,
     dependencies: &mut ContextDependencies
 ) -> Result<BuiltAccount> {
 
     let mut out = DynStruct::<RealAccountProps>::new();
-    let is_init = args.iter().any(|i| i == "init");
-    let mut init_props = DynStruct::<RealAccountPropsSansInit>::new();
+    let is_init = args.iter().find(|i| i.0 == "init");
+    let mut added_props = DynStruct::<RealAccountPropsSansInit>::new();
 
-    account.iter().for_each(|prop| {
-        match_case_RealAccountPropsSansInit!(prop.1, ParseAccountProps,
-            oo => { out.insert(oo); },
-            ParseAccountProps::InitIfNeeded(o) => { out.insert(o); },
-            ParseAccountProps::Init(o) => { if is_init { init_props = o.unwrap(); } },
-            ParseAccountProps::NoInit(o) => { if !is_init { init_props = o.unwrap(); } },
-            ParseAccountProps::Depends(o) => {
-                o.unwrap().into_iter().for_each(|d| { dependencies.entry(d).or_insert(vec![]); });
+    for prop in account.iter().cloned() {
+        match_case_RealAccountPropsSansInit!(prop, ParseAccountProps,
+            o => { out.insert(o); },
+
+            ParseAccountProps::InitIfNeeded(o) => { if is_init.is_none() { out.insert(o); } },
+            ParseAccountProps::ConditionalProps(c) => {
+                let y = args.contains(&c.arg);
+                added_props.update(if y { c._if.clone() } else { c._else.clone() });
+            },
+
+            // TODO: Carry spans
+            ParseAccountProps::Init(Init(o)) => {
+                if is_init.is_some() { added_props.update(o.1); }
+            },
+            ParseAccountProps::NoInit(NoInit(o)) => {
+                if is_init.is_none() { added_props.update(o.1); }
+            },
+            ParseAccountProps::Depends(Depends(o)) => {
+                o.1.into_iter().for_each(|d| { dependencies.entry(d).or_insert(vec![]); });
             },
         )
-    });
+    }
 
-    init_props.iter().for_each(|prop| { out.insert_dyn(prop.1.into()); });
+    added_props.iter().cloned().for_each(|prop| { out.insert_dyn(prop.into()); });
 
-    if is_init {
-        out.insert(RealInit(()));
+    if let Some(id) = is_init {
+        out.insert(RealInit(LabelledProp(id.0.clone().into(), ())));
+    }
+
+    if let Some(p) = args.iter().find(|i| i.0 == "mut") {
+        out.insert(Mut(LabelledProp(p.0.clone().into(), ())));
     }
 
     Ok(BuiltAccount(out))
 }
+

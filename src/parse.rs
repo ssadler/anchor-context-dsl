@@ -1,5 +1,5 @@
 
-use syn::spanned::Spanned;
+use syn::token::Default;
 use syn::*;
 use crate::types::*;
 use crate::indented::*;
@@ -27,8 +27,7 @@ impl parse::Parse for YamlDoc {
                 if accounts.has(&name) {
                     panic!("account exists: {}", name);
                 }
-                let t = input.parse::<Token![:]>()?;
-                //return Err(parse_error!(input.span(), "wat"));
+                input.parse::<Token![:]>()?;
 
                 accounts.insert(name, parse_indented::<Indent<1>, _>(input)?)?;
             }
@@ -49,13 +48,11 @@ impl<L: IndentLevel> ParseIndented<L> for ContextProp {
             let args = parse_instruction_args::<L, syn::FnArg>(input)?;
             Ok(ContextProp::Instruction { args })
         } else {
-
             let args = if input.peek(Token![:]) {
                 input.parse::<Token![:]>()?;
                 let content;
                 syn::bracketed!(content in input);
-
-                let args = content.parse_terminated::<syn::Ident, Token![,]>(|p| p.parse())?;
+                let args = content.parse_terminated::<AccountArg, Token![,]>(|p| p.parse())?;
                 args.into_iter().collect()
             } else {
                 vec![]
@@ -66,12 +63,38 @@ impl<L: IndentLevel> ParseIndented<L> for ContextProp {
     }
 }
 
+impl<I: IndentLevel, Set: DispatchParseIndented> ParseIndented<I> for AccountConditionalProps<Set> {
+    fn parse_indented(input: parse::ParseStream) -> Result<Self> {
+        //input.parse::<Token![if]>()?;
+        let arg = input.parse::<AccountArg>()?;
+        input.parse::<Token![:]>()?;
+        let _if = parse_indented_next_level::<I, DynStruct<Set>>(input)?;
+        let mut _else = DynStruct::new();
+        if input.fork().parse::<I>().is_ok() && input.peek2(Token![else]) {
+            input.parse::<I>()?;
+            input.parse::<Token![else]>()?;
+            input.parse::<Token![:]>()?;
+            _else = parse_indented_next_level::<I, DynStruct<Set>>(input)?;
+        }
+        Ok(AccountConditionalProps { arg, _if, _else })
+    }
+}
+impl<I: IndentLevel> ParseIndented<I> for ConditionalProps {
+    fn parse_indented(input: parse::ParseStream) -> Result<Self> {
+        let t = input.parse()?;
+        Ok(ConditionalProps(LabelledProp(t, parse_indented::<I, _>(input)?)))
+    }
+}
+
 
 macro_rules! define_prop_parser {
     ($struct_name:ident, $f:ident) => {
         impl<L: IndentLevel> ParseIndented<L> for $struct_name {
             fn parse_indented(input: parse::ParseStream) -> Result<Self> {
-                Ok($struct_name($f::<L, _>(input)?))
+
+                let label = input.parse()?;
+                input.parse::<Token![:]>()?;
+                Ok($struct_name(LabelledProp(label, $f::<L, _>(input)?)))
             }
         }
     };
@@ -79,7 +102,6 @@ macro_rules! define_prop_parser {
 }
 
 define_prop_parser!(Space);
-define_prop_parser!(Mut);
 define_prop_parser!(Boxed);
 define_prop_parser!(ZeroCopy);
 define_prop_parser!(Check);
@@ -126,57 +148,88 @@ impl<L: IndentLevel, Set: DispatchParseIndented> ParseIndented<L> for DynStruct<
 
 
 
+
 trait DispatchParseIndented: PropSet {
-    fn dispatch<L: IndentLevel>(label: &str, input: parse::ParseStream) -> Result<Self>;
+    fn dispatch<L: IndentLevel>(label: PropLabel, input: parse::ParseStream) -> Result<Self>;
 }
 impl DispatchParseIndented for ParseAccountProps {
-    fn dispatch<L: IndentLevel>(label: &str, input: parse::ParseStream) -> Result<Self> {
-        impl_prop_dispatch_ParseAccountProps!(label, |T| {
+    fn dispatch<L: IndentLevel>(label: PropLabel, input: parse::ParseStream) -> Result<Self> {
+        prop_dispatch_ParseAccountProps!(label, |T| {
             <T as ParseIndented<L>>::parse_indented(input).map(|s| s.into())
-        }, Err(parse_error!(input.span(), "invalid property")))
+        }, Err(parse_error!(label.span(), "invalid property")))
     }
 }
 impl DispatchParseIndented for RealAccountPropsSansInit {
-    fn dispatch<L: IndentLevel>(label: &str, input: parse::ParseStream) -> Result<Self> {
-        impl_prop_dispatch_RealAccountPropsSansInit!(label, |T| {
+    fn dispatch<L: IndentLevel>(label: PropLabel, input: parse::ParseStream) -> Result<Self> {
+        prop_dispatch_RealAccountPropsSansInit!(label, |T| {
             <T as ParseIndented<L>>::parse_indented(input).map(|r| r.into())
-        }, Err(parse_error!(input.span(), "invalid property")))
+        }, Err(parse_error!(label.span(), "invalid property")))
     }
 }
 
 impl<L: IndentLevel, Set: DispatchParseIndented> ParseIndented<L> for Set {
     fn parse_indented(input: parse::ParseStream) -> Result<Self> {
-        let PropLabel(span, label) = input.fork().parse()?;
-        if !Set::has_prop(label) {
-            eprintln!("{:?}", Set::PROPS);
-            return Err(parse_error!(input.span(), format!("invalid property: {}", label)));
+        let label: PropLabel = input.fork().parse()?;
+        if !Set::has_prop(label.label) {
+            return Err(parse_error!(input.span(), format!("invalid property: {}", label.label)));
         }
-        let PropLabel(span, label) = input.parse()?;
-        input.parse::<Token![:]>()?;
         <Set as DispatchParseIndented>::dispatch::<L>(label, input)
+    }
+}
+
+
+impl<I: IndentLevel, T: ParseIndented<I>> ParseIndented<I> for LabelledProp<T> {
+    fn parse_indented(input: parse::ParseStream) -> Result<Self> {
+        eprintln!("LP: {:?}", input);
+        let label = input.parse()?;
+        input.parse::<Token![:]>()?;
+        Ok(LabelledProp(label, parse_indented(input)?))
+    }
+}
+
+struct AnyIdent(proc_macro2::Ident);
+impl parse::Parse for AnyIdent {
+    fn parse(input: parse::ParseStream) -> Result<Self> {
+        let (id, _) = input.cursor().ident().ok_or(parse_error!(input.span(), "Expected identifier"))?;
+        input.step(|c| Ok(((), c.ident().unwrap().1)))?;
+        Ok(AnyIdent(id))
+    }
+}
+
+
+impl parse::Parse for PropLabel {
+    fn parse(input: parse::ParseStream) -> Result<Self> {
+
+        let path = if input.peek2(Token![::]) {
+            input.parse::<syn::Path>()?
+        } else {
+            let AnyIdent(id) = input.parse()?;
+            id.into()
+        };
+
+        Ok(PropLabel::from_path(path))
+    }
+}
+
+
+impl parse::Parse for AccountArg {
+    fn parse(input: parse::ParseStream) -> Result<Self> {
+        let AnyIdent(id) = input.parse()?;
+        Ok(AccountArg(id))
     }
 }
 
 
 
 
-struct PropLabel(proc_macro2::Span, &'static str);
-impl parse::Parse for PropLabel {
-    fn parse(input: parse::ParseStream) -> Result<Self> {
-        if input.peek(Token![type]) {
-            let t = input.parse::<Token![type]>()?;
-            Ok(PropLabel(t.span, "type"))
-        } else if input.peek(Token![struct]) {
-            let t = input.parse::<Token![struct]>()?;
-            Ok(PropLabel(t.span, "struct"))
-        } else if input.peek(Token![mut]) {
-            let t = input.parse::<Token![mut]>()?;
-            Ok(PropLabel(t.span, "mut"))
-        } else {
-            let path = input.parse::<syn::Path>()?;
-            let s = quote::quote!(#path).to_string();
-            let s = Box::leak(s.to_owned().into_boxed_str());
-            Ok(PropLabel(path.segments[0].span(), s))
-        }
+
+
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_wat() {
+        let id = syn::Ident::new("type", proc_macro2::Span::call_site());
+        println!("{}", id);
     }
 }

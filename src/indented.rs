@@ -10,14 +10,9 @@ pub fn parse_at_level_fn<L: IndentLevel>(
 ) -> Result<()> {
     input.parse::<L>()?;
     f()?;
-    loop {
-        match input.fork().parse::<L>() {
-            Ok(_) => {
-                input.parse::<L>()?;
-                f()?;
-            },
-            _ => break
-        }
+    while input.fork().parse::<L>().is_ok() {
+        input.parse::<L>()?;
+        f()?;
     }
     Ok(())
 }
@@ -25,27 +20,18 @@ pub fn parse_at_level_fn<L: IndentLevel>(
 pub fn parse_at_level<I: IndentLevel, T: ParseIndented<I>>(
     input: parse::ParseStream
 ) -> Result<Vec<T>> {
-    //panic!("{}", I::get_level());
-    input.parse::<I>()?;
-    //return Err(parse_error!(input.span(), "waaat"));
-    let mut out = vec![T::parse_indented(input)?];
-    loop {
-        match input.fork().parse::<I>() {
-            Ok(_) => {
-                input.parse::<I>()?;
-                out.push(T::parse_indented(input)?);
-            },
-            _ => break
-        }
-    }
+    let mut out = vec![];
+    parse_at_level_fn::<I>(input, || Ok(out.push(parse_indented(input)?)))?;
     Ok(out)
 }
+
+
 
 struct YamlListItem<T>(T);
 impl<L: IndentLevel, T: ParseIndented<L>> ParseIndented<L> for YamlListItem<T> {
     fn parse_indented(input: parse::ParseStream) -> Result<Self> {
         input.parse::<Token![-]>()?;
-        Ok(YamlListItem(T::parse_indented(input)?))
+        Ok(YamlListItem(parse_indented(input)?))
     }
 }
 pub fn parse_yaml_array<I: IndentLevel, T: ParseIndented<I::Next>>(
@@ -54,10 +40,9 @@ pub fn parse_yaml_array<I: IndentLevel, T: ParseIndented<I::Next>>(
     if input.peek(syn::token::Bracket) {
         let content;
         syn::bracketed!(content in input);
-        let items = content.parse_terminated::<T, Token![,]>(|p| T::parse_indented(p))?;
+        let items = content.parse_terminated::<T, Token![,]>(parse_indented)?;
         Ok(items.into_iter().collect())
     } else {
-        //eprintln!("!!!!!!!{:?}\na\na", input);
         let out: Vec<YamlListItem<T>> = parse_at_level::<I::Next, _>(input)?;
         Ok(out.into_iter().map(|YamlListItem(t)| t).collect())
     }
@@ -80,9 +65,10 @@ pub fn parse_yaml_token_array<I: IndentLevel, T: parse::Parse>(input: parse::Par
 }
 
 
-pub trait ParseIndented<L: IndentLevel>: Sized {
+pub trait ParseIndented<I: IndentLevel>: Sized {
     fn parse_indented(input: parse::ParseStream) -> Result<Self>;
 }
+
 
 pub fn parse_indented<L: IndentLevel, O: ParseIndented<L>>(input: parse::ParseStream) -> Result<O> {
     O::parse_indented(input)

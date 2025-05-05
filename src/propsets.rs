@@ -1,24 +1,12 @@
 
 use std::{collections::HashMap, fmt::Debug};
 
-
-pub trait PropSet_: Clone + Debug {
-    type Key;
-    const PROPS: &[&str];
-    fn has_prop(label: &str) -> bool;
-    fn key(&self) -> Self::Key;
-}
-pub struct DynStruct_<Set: PropSet_>(HashMap<Set::Key, Set>);
-
-
-
-
 #[derive(Debug, Clone)]
 pub struct DynStruct<Set: PropSet>(HashMap<&'static str, Set>);
 impl<Set: PropSet> DynStruct<Set> {
     pub fn new() -> Self { DynStruct(HashMap::new()) }
-    pub fn has(&self, label: &str) -> bool {
-        self.0.contains_key(label)
+    pub fn has<P: PropOf<Set>>(&self) -> bool {
+        self.0.contains_key(P::LABEL)
     }
     pub fn get<P: PropOf<Set>>(&self) -> Option<&P> {
         self.0.get(P::LABEL).map(P::downcast_ref)
@@ -29,11 +17,8 @@ impl<Set: PropSet> DynStruct<Set> {
     pub fn insert_dyn(&mut self, prop: Set) -> Option<Set> {
         self.0.insert(prop.label(), prop)
     }
-    pub fn iter(&self) -> impl Iterator<Item=(&str, Set)> {
-        self.0.clone().into_iter().map(|(k, v)| { (k, v) })
-    }
-    pub fn len(&self) -> usize {
-        self.0.len()
+    pub fn iter(&self) -> impl Iterator<Item=&Set> {
+        Set::PROPS.iter().map(|s| self.0.get(*s)).flatten()
     }
     pub fn remove<P: PropOf<Set>>(&mut self) -> Option<P> {
         self.0.remove(P::LABEL).map(P::downcast)
@@ -41,13 +26,15 @@ impl<Set: PropSet> DynStruct<Set> {
     pub fn keys(&self) -> impl Iterator<Item=&str> {
         self.0.keys().cloned()
     }
+    pub fn update(&mut self, other: DynStruct<Set>) {
+        self.0.extend(other.0);
+    }
 }
 
 
-pub trait IsDynProp {
+pub trait IsProp {
     const LABEL: &'static str;
 }
-
 
 pub trait PropSet: Clone + Debug {
     const PROPS: &[&str];
@@ -55,71 +42,69 @@ pub trait PropSet: Clone + Debug {
     fn label(&self) -> &'static str;
 }
 
-pub trait PropOf<Set: PropSet>: IsDynProp + Into<Set> {
+pub trait PropOf<Set: PropSet>: IsProp + Into<Set> {
+    const INDEX: usize;
     fn downcast(set: Set) -> Self;
     fn downcast_ref(set: &Set) -> &Self;
 }
 
 macro_rules! define_prop {
-    ($struct_name:ident, $label:literal, $type:ty) => {
-        #[derive(Debug, Clone)]
-        pub struct $struct_name(pub $type);
-        impl IsDynProp for $struct_name {
+    ($struct_name:ident, $label:literal) => {
+        impl IsProp for $struct_name {
             const LABEL: &'static str = $label;
-        }
-        impl $struct_name {
-            #[allow(dead_code)]
-            pub fn unwrap(self) -> $type { self.0 }
-        }
-        impl std::ops::Deref for $struct_name {
-            type Target = $type;
-            fn deref(&self) -> &Self::Target {
-                &self.0
-            }
         }
     };
 }
 
-
 macro_rules! define_prop_set {
     ($set:ident, $($prop:ident),+) => {
-        define_prop_set!(@ $set, $($prop),+ | $);
+        define_prop_set!(!set $set, $($prop),+ | $);
     };
-    (@ $set:ident, $($prop:ident),+ | $D:tt) => {
-        #[derive(Debug, Clone)]
-        pub enum $set { $($prop($prop)),* }
-        $(impl PropOf<$set> for $prop {
+    (!idx $i:expr, $set:ident, $prop:ident $(,$rest:ident)*) => {
+        impl PropOf<$set> for $prop {
+            const INDEX: usize = $i;
             fn downcast_ref(set: &$set) -> &Self {
                 match set { $set::$prop(o) => o, _ => panic!("downcast_ref failed") }
             }
             fn downcast(set: $set) -> Self {
-                match set { $set::$prop(o) => o, _ => panic!("downcast_ref failed") }
+                match set { $set::$prop(o) => o, _ => panic!("downcast failed") }
             }
-        })*
+        }
+        define_prop_set!(!idx $i+1, $set $(,$rest)*);
+    };
+    (!idx $i:expr, $set:ident) => {};
+    (!set $set:ident, $($prop:ident),+ | $D:tt) => {
+
+        #[derive(Debug, Clone)]
+        pub enum $set { $($prop($prop)),* }
+
 
         impl PropSet for $set {
             const PROPS: &[&str] = &[$($prop::LABEL),*];
             fn has_prop(label: &str) -> bool {
-                $(label == $prop::LABEL)||+
+                Self::PROPS.iter().any(|&l| l == label)
             }
             fn label(&self) -> &'static str {
                 match self { $($set::$prop(_) => $prop::LABEL),* }
             }
         }
 
+        define_prop_set!(!idx 0, $set, $($prop),*);
+
         $(impl Into<$set> for $prop {
             fn into(self) -> $set { $set::$prop(self) }
         })*
 
+
         paste::paste! {
             #[allow(unused_macros)]
-            macro_rules! [<impl_prop_dispatch_ $set>] {
+            macro_rules! [<prop_dispatch_ $set>] {
                 ($label:ident, |$T:ident| $expr:expr, $fail:expr) => {
                     $( if $label == $prop::LABEL { type $T = $prop; $expr } else )+ { $fail }
                 };
             }
             #[allow(unused_imports)]
-            pub(crate) use [<impl_prop_dispatch_ $set>];
+            pub(crate) use [<prop_dispatch_ $set>];
 
             #[allow(unused_macros)]
             macro_rules! [<match_case_ $set>] {
@@ -130,11 +115,11 @@ macro_rules! define_prop_set {
                     }
                 }
             }
-            #[allow(unused_imports)]
+            #[allow(unused_macros, unused_imports)]
             pub(crate) use [<match_case_ $set>];
 
 
-            #[allow(unused_macros)]
+            #[allow(unused_macros, unused_imports)]
             macro_rules! [<extend_set_ $set>] {
                 ($set2:ident, $D($prop2:ident),+) => {
                     define_prop_set!($set2 $(,$prop)* $D(,$prop2)*);
@@ -157,6 +142,14 @@ macro_rules! define_prop_set {
                 };
             }
 
+            #[allow(unused_macros)]
+            macro_rules! [<prop_match_ $set>] {
+                ($p:ident, |$inner:ident| $expr:expr) => {
+                    match $p { $($set::$prop($inner) => $expr),* }
+                };
+            }
+            #[allow(unused_imports)]
+            pub(crate) use [<prop_match_ $set>];
         }
     };
 }

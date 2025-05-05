@@ -34,11 +34,11 @@ sys:
 cell:
   type: Cell
   boxed: true
-  init:
+
+  if init:
     space: 10240
     seeds: [b"cell", cell_id.to_le_bytes().as_ref()]
-  noinit:
-    mut: true
+  else:
     seeds: [b"cell", cell.id.to_le_bytes().as_ref()]
 
 //  noinit:
@@ -57,4 +57,5 @@ struct Cell { id: u32 }
 
 #[account]
 struct CellSystem { a: bool }
+
 
