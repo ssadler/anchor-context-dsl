@@ -1,0 +1,677 @@
+#![feature(prelude_import)]
+#![allow(unexpected_cfgs)]
+#[prelude_import]
+use std::prelude::rust_2024::*;
+#[macro_use]
+extern crate std;
+pub use anchor_lang::system_program::ID;
+pub use anchor_spl::token::{TokenAccount, Mint};
+use anchor_yaml_accounts::*;
+use anchor_lang::prelude::*;
+mod contexts {
+    use super::*;
+    pub struct Thingy<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(
+            init,
+            payer = payer,
+            space = 128,
+            constraint = quote_mint.freeze_authority.is_none()
+        )]
+        pub quote_mint: Account<'info, Mint>,
+        pub system_program: Program<'info, System>,
+    }
+    #[automatically_derived]
+    impl<'info> anchor_lang::Accounts<'info, ThingyBumps> for Thingy<'info>
+    where
+        'info: 'info,
+    {
+        #[inline(never)]
+        fn try_accounts(
+            __program_id: &anchor_lang::solana_program::pubkey::Pubkey,
+            __accounts: &mut &'info [anchor_lang::solana_program::account_info::AccountInfo<
+                'info,
+            >],
+            __ix_data: &[u8],
+            __bumps: &mut ThingyBumps,
+            __reallocs: &mut std::collections::BTreeSet<
+                anchor_lang::solana_program::pubkey::Pubkey,
+            >,
+        ) -> anchor_lang::Result<Self> {
+            let payer: Signer = anchor_lang::Accounts::try_accounts(
+                    __program_id,
+                    __accounts,
+                    __ix_data,
+                    __bumps,
+                    __reallocs,
+                )
+                .map_err(|e| e.with_account_name("payer"))?;
+            if __accounts.is_empty() {
+                return Err(anchor_lang::error::ErrorCode::AccountNotEnoughKeys.into());
+            }
+            let quote_mint = &__accounts[0];
+            *__accounts = &__accounts[1..];
+            let system_program: anchor_lang::accounts::program::Program<System> = anchor_lang::Accounts::try_accounts(
+                    __program_id,
+                    __accounts,
+                    __ix_data,
+                    __bumps,
+                    __reallocs,
+                )
+                .map_err(|e| e.with_account_name("system_program"))?;
+            let __anchor_rent = Rent::get()?;
+            let quote_mint = ({
+                #[inline(never)]
+                || {
+                    let actual_field = AsRef::<AccountInfo>::as_ref(&quote_mint);
+                    let actual_owner = actual_field.owner;
+                    let space = 128;
+                    let pa: anchor_lang::accounts::account::Account<Mint> = if !false
+                        || actual_owner
+                            == &anchor_lang::solana_program::system_program::ID
+                    {
+                        let __current_lamports = quote_mint.lamports();
+                        if __current_lamports == 0 {
+                            let space = space;
+                            let lamports = __anchor_rent.minimum_balance(space);
+                            let cpi_accounts = anchor_lang::system_program::CreateAccount {
+                                from: payer.to_account_info(),
+                                to: quote_mint.to_account_info(),
+                            };
+                            let cpi_context = anchor_lang::context::CpiContext::new(
+                                system_program.to_account_info(),
+                                cpi_accounts,
+                            );
+                            anchor_lang::system_program::create_account(
+                                cpi_context.with_signer(&[]),
+                                lamports,
+                                space as u64,
+                                __program_id,
+                            )?;
+                        } else {
+                            if payer.key() == quote_mint.key() {
+                                return Err(
+                                    anchor_lang::error::Error::from(anchor_lang::error::AnchorError {
+                                            error_name: anchor_lang::error::ErrorCode::TryingToInitPayerAsProgramAccount
+                                                .name(),
+                                            error_code_number: anchor_lang::error::ErrorCode::TryingToInitPayerAsProgramAccount
+                                                .into(),
+                                            error_msg: anchor_lang::error::ErrorCode::TryingToInitPayerAsProgramAccount
+                                                .to_string(),
+                                            error_origin: Some(
+                                                anchor_lang::error::ErrorOrigin::Source(anchor_lang::error::Source {
+                                                    filename: "src/lib.rs",
+                                                    line: 10u32,
+                                                }),
+                                            ),
+                                            compared_values: None,
+                                        })
+                                        .with_pubkeys((payer.key(), quote_mint.key())),
+                                );
+                            }
+                            let required_lamports = __anchor_rent
+                                .minimum_balance(space)
+                                .max(1)
+                                .saturating_sub(__current_lamports);
+                            if required_lamports > 0 {
+                                let cpi_accounts = anchor_lang::system_program::Transfer {
+                                    from: payer.to_account_info(),
+                                    to: quote_mint.to_account_info(),
+                                };
+                                let cpi_context = anchor_lang::context::CpiContext::new(
+                                    system_program.to_account_info(),
+                                    cpi_accounts,
+                                );
+                                anchor_lang::system_program::transfer(
+                                    cpi_context,
+                                    required_lamports,
+                                )?;
+                            }
+                            let cpi_accounts = anchor_lang::system_program::Allocate {
+                                account_to_allocate: quote_mint.to_account_info(),
+                            };
+                            let cpi_context = anchor_lang::context::CpiContext::new(
+                                system_program.to_account_info(),
+                                cpi_accounts,
+                            );
+                            anchor_lang::system_program::allocate(
+                                cpi_context.with_signer(&[]),
+                                space as u64,
+                            )?;
+                            let cpi_accounts = anchor_lang::system_program::Assign {
+                                account_to_assign: quote_mint.to_account_info(),
+                            };
+                            let cpi_context = anchor_lang::context::CpiContext::new(
+                                system_program.to_account_info(),
+                                cpi_accounts,
+                            );
+                            anchor_lang::system_program::assign(
+                                cpi_context.with_signer(&[]),
+                                __program_id,
+                            )?;
+                        }
+                        match anchor_lang::accounts::account::Account::try_from_unchecked(
+                            &quote_mint,
+                        ) {
+                            Ok(val) => val,
+                            Err(e) => return Err(e.with_account_name("quote_mint")),
+                        }
+                    } else {
+                        match anchor_lang::accounts::account::Account::try_from(
+                            &quote_mint,
+                        ) {
+                            Ok(val) => val,
+                            Err(e) => return Err(e.with_account_name("quote_mint")),
+                        }
+                    };
+                    if false {
+                        if space != actual_field.data_len() {
+                            return Err(
+                                anchor_lang::error::Error::from(
+                                        anchor_lang::error::ErrorCode::ConstraintSpace,
+                                    )
+                                    .with_account_name("quote_mint")
+                                    .with_values((space, actual_field.data_len())),
+                            );
+                        }
+                        if actual_owner != __program_id {
+                            return Err(
+                                anchor_lang::error::Error::from(
+                                        anchor_lang::error::ErrorCode::ConstraintOwner,
+                                    )
+                                    .with_account_name("quote_mint")
+                                    .with_pubkeys((*actual_owner, *__program_id)),
+                            );
+                        }
+                        {
+                            let required_lamports = __anchor_rent.minimum_balance(space);
+                            if pa.to_account_info().lamports() < required_lamports {
+                                return Err(
+                                    anchor_lang::error::Error::from(
+                                            anchor_lang::error::ErrorCode::ConstraintRentExempt,
+                                        )
+                                        .with_account_name("quote_mint"),
+                                );
+                            }
+                        }
+                    }
+                    Ok(pa)
+                }
+            })()?;
+            if !AsRef::<AccountInfo>::as_ref(&quote_mint).is_writable {
+                return Err(
+                    anchor_lang::error::Error::from(
+                            anchor_lang::error::ErrorCode::ConstraintMut,
+                        )
+                        .with_account_name("quote_mint"),
+                );
+            }
+            if !AsRef::<AccountInfo>::as_ref(&quote_mint).is_signer {
+                return Err(
+                    anchor_lang::error::Error::from(
+                            anchor_lang::error::ErrorCode::ConstraintSigner,
+                        )
+                        .with_account_name("quote_mint"),
+                );
+            }
+            if !(quote_mint.freeze_authority.is_none()) {
+                return Err(
+                    anchor_lang::error::Error::from(
+                            anchor_lang::error::ErrorCode::ConstraintRaw,
+                        )
+                        .with_account_name("quote_mint"),
+                );
+            }
+            if !__anchor_rent
+                .is_exempt(
+                    quote_mint.to_account_info().lamports(),
+                    quote_mint.to_account_info().try_data_len()?,
+                )
+            {
+                return Err(
+                    anchor_lang::error::Error::from(
+                            anchor_lang::error::ErrorCode::ConstraintRentExempt,
+                        )
+                        .with_account_name("quote_mint"),
+                );
+            }
+            if !AsRef::<AccountInfo>::as_ref(&payer).is_writable {
+                return Err(
+                    anchor_lang::error::Error::from(
+                            anchor_lang::error::ErrorCode::ConstraintMut,
+                        )
+                        .with_account_name("payer"),
+                );
+            }
+            Ok(Thingy {
+                payer,
+                quote_mint,
+                system_program,
+            })
+        }
+    }
+    #[automatically_derived]
+    impl<'info> anchor_lang::ToAccountInfos<'info> for Thingy<'info>
+    where
+        'info: 'info,
+    {
+        fn to_account_infos(
+            &self,
+        ) -> Vec<anchor_lang::solana_program::account_info::AccountInfo<'info>> {
+            let mut account_infos = ::alloc::vec::Vec::new();
+            account_infos.extend(self.payer.to_account_infos());
+            account_infos.extend(self.quote_mint.to_account_infos());
+            account_infos.extend(self.system_program.to_account_infos());
+            account_infos
+        }
+    }
+    #[automatically_derived]
+    impl<'info> anchor_lang::ToAccountMetas for Thingy<'info> {
+        fn to_account_metas(
+            &self,
+            is_signer: Option<bool>,
+        ) -> Vec<anchor_lang::solana_program::instruction::AccountMeta> {
+            let mut account_metas = ::alloc::vec::Vec::new();
+            account_metas.extend(self.payer.to_account_metas(None));
+            account_metas.extend(self.quote_mint.to_account_metas(Some(true)));
+            account_metas.extend(self.system_program.to_account_metas(None));
+            account_metas
+        }
+    }
+    #[automatically_derived]
+    impl<'info> anchor_lang::AccountsExit<'info> for Thingy<'info>
+    where
+        'info: 'info,
+    {
+        fn exit(
+            &self,
+            program_id: &anchor_lang::solana_program::pubkey::Pubkey,
+        ) -> anchor_lang::Result<()> {
+            anchor_lang::AccountsExit::exit(&self.payer, program_id)
+                .map_err(|e| e.with_account_name("payer"))?;
+            anchor_lang::AccountsExit::exit(&self.quote_mint, program_id)
+                .map_err(|e| e.with_account_name("quote_mint"))?;
+            Ok(())
+        }
+    }
+    pub struct ThingyBumps {}
+    #[automatically_derived]
+    impl ::core::fmt::Debug for ThingyBumps {
+        #[inline]
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            ::core::fmt::Formatter::write_str(f, "ThingyBumps")
+        }
+    }
+    impl Default for ThingyBumps {
+        fn default() -> Self {
+            ThingyBumps {}
+        }
+    }
+    impl<'info> anchor_lang::Bumps for Thingy<'info>
+    where
+        'info: 'info,
+    {
+        type Bumps = ThingyBumps;
+    }
+    /// An internal, Anchor generated module. This is used (as an
+    /// implementation detail), to generate a struct for a given
+    /// `#[derive(Accounts)]` implementation, where each field is a Pubkey,
+    /// instead of an `AccountInfo`. This is useful for clients that want
+    /// to generate a list of accounts, without explicitly knowing the
+    /// order all the fields should be in.
+    ///
+    /// To access the struct in this module, one should use the sibling
+    /// `accounts` module (also generated), which re-exports this.
+    pub(crate) mod __client_accounts_thingy {
+        use super::*;
+        use anchor_lang::prelude::borsh;
+        /// Generated client accounts for [`Thingy`].
+        pub struct Thingy {
+            pub payer: Pubkey,
+            pub quote_mint: Pubkey,
+            pub system_program: Pubkey,
+        }
+        impl borsh::ser::BorshSerialize for Thingy
+        where
+            Pubkey: borsh::ser::BorshSerialize,
+            Pubkey: borsh::ser::BorshSerialize,
+            Pubkey: borsh::ser::BorshSerialize,
+        {
+            fn serialize<W: borsh::maybestd::io::Write>(
+                &self,
+                writer: &mut W,
+            ) -> ::core::result::Result<(), borsh::maybestd::io::Error> {
+                borsh::BorshSerialize::serialize(&self.payer, writer)?;
+                borsh::BorshSerialize::serialize(&self.quote_mint, writer)?;
+                borsh::BorshSerialize::serialize(&self.system_program, writer)?;
+                Ok(())
+            }
+        }
+        #[automatically_derived]
+        impl anchor_lang::ToAccountMetas for Thingy {
+            fn to_account_metas(
+                &self,
+                is_signer: Option<bool>,
+            ) -> Vec<anchor_lang::solana_program::instruction::AccountMeta> {
+                let mut account_metas = ::alloc::vec::Vec::new();
+                account_metas
+                    .push(
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            self.payer,
+                            true,
+                        ),
+                    );
+                account_metas
+                    .push(
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            self.quote_mint,
+                            true,
+                        ),
+                    );
+                account_metas
+                    .push(
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            self.system_program,
+                            false,
+                        ),
+                    );
+                account_metas
+            }
+        }
+    }
+    /// An internal, Anchor generated module. This is used (as an
+    /// implementation detail), to generate a CPI struct for a given
+    /// `#[derive(Accounts)]` implementation, where each field is an
+    /// AccountInfo.
+    ///
+    /// To access the struct in this module, one should use the sibling
+    /// [`cpi::accounts`] module (also generated), which re-exports this.
+    pub(crate) mod __cpi_client_accounts_thingy {
+        use super::*;
+        /// Generated CPI struct of the accounts for [`Thingy`].
+        pub struct Thingy<'info> {
+            pub payer: anchor_lang::solana_program::account_info::AccountInfo<'info>,
+            pub quote_mint: anchor_lang::solana_program::account_info::AccountInfo<
+                'info,
+            >,
+            pub system_program: anchor_lang::solana_program::account_info::AccountInfo<
+                'info,
+            >,
+        }
+        #[automatically_derived]
+        impl<'info> anchor_lang::ToAccountMetas for Thingy<'info> {
+            fn to_account_metas(
+                &self,
+                is_signer: Option<bool>,
+            ) -> Vec<anchor_lang::solana_program::instruction::AccountMeta> {
+                let mut account_metas = ::alloc::vec::Vec::new();
+                account_metas
+                    .push(
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            anchor_lang::Key::key(&self.payer),
+                            true,
+                        ),
+                    );
+                account_metas
+                    .push(
+                        anchor_lang::solana_program::instruction::AccountMeta::new(
+                            anchor_lang::Key::key(&self.quote_mint),
+                            true,
+                        ),
+                    );
+                account_metas
+                    .push(
+                        anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                            anchor_lang::Key::key(&self.system_program),
+                            false,
+                        ),
+                    );
+                account_metas
+            }
+        }
+        #[automatically_derived]
+        impl<'info> anchor_lang::ToAccountInfos<'info> for Thingy<'info> {
+            fn to_account_infos(
+                &self,
+            ) -> Vec<anchor_lang::solana_program::account_info::AccountInfo<'info>> {
+                let mut account_infos = ::alloc::vec::Vec::new();
+                account_infos
+                    .extend(anchor_lang::ToAccountInfos::to_account_infos(&self.payer));
+                account_infos
+                    .extend(
+                        anchor_lang::ToAccountInfos::to_account_infos(&self.quote_mint),
+                    );
+                account_infos
+                    .extend(
+                        anchor_lang::ToAccountInfos::to_account_infos(
+                            &self.system_program,
+                        ),
+                    );
+                account_infos
+            }
+        }
+    }
+    pub struct ThingyWrap<'info> {
+        pub system_program: ReadOnly<Program<'info, System>>,
+        pub quote_mint: Account<'info, Mint>,
+        pub payer: Signer<'info>,
+    }
+    impl<'info> HasMutWrapper for Thingy<'info> {
+        type W = ThingyWrap<'info>;
+    }
+    const _: () = if !(std::mem::size_of::<Thingy>()
+        == std::mem::size_of::<ThingyWrap>())
+    {
+        ::core::panicking::panic(
+            "assertion failed: std::mem::size_of::<Thingy>() == std::mem::size_of::<ThingyWrap>()",
+        )
+    };
+    pub struct ReadOnly<T>(T);
+    impl<T> std::ops::Deref for ReadOnly<T> {
+        type Target = T;
+        fn deref(&self) -> &T {
+            &self.0
+        }
+    }
+    pub trait HasMutWrapper {
+        type W;
+    }
+}
+use contexts::*;
+struct Cell {
+    id: u32,
+}
+impl borsh::ser::BorshSerialize for Cell
+where
+    u32: borsh::ser::BorshSerialize,
+{
+    fn serialize<W: borsh::maybestd::io::Write>(
+        &self,
+        writer: &mut W,
+    ) -> ::core::result::Result<(), borsh::maybestd::io::Error> {
+        borsh::BorshSerialize::serialize(&self.id, writer)?;
+        Ok(())
+    }
+}
+impl borsh::de::BorshDeserialize for Cell
+where
+    u32: borsh::BorshDeserialize,
+{
+    fn deserialize_reader<R: borsh::maybestd::io::Read>(
+        reader: &mut R,
+    ) -> ::core::result::Result<Self, borsh::maybestd::io::Error> {
+        Ok(Self {
+            id: borsh::BorshDeserialize::deserialize_reader(reader)?,
+        })
+    }
+}
+#[automatically_derived]
+impl ::core::clone::Clone for Cell {
+    #[inline]
+    fn clone(&self) -> Cell {
+        Cell {
+            id: ::core::clone::Clone::clone(&self.id),
+        }
+    }
+}
+#[automatically_derived]
+impl anchor_lang::AccountSerialize for Cell {
+    fn try_serialize<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+    ) -> anchor_lang::Result<()> {
+        if writer.write_all(Cell::DISCRIMINATOR).is_err() {
+            return Err(anchor_lang::error::ErrorCode::AccountDidNotSerialize.into());
+        }
+        if AnchorSerialize::serialize(self, writer).is_err() {
+            return Err(anchor_lang::error::ErrorCode::AccountDidNotSerialize.into());
+        }
+        Ok(())
+    }
+}
+#[automatically_derived]
+impl anchor_lang::AccountDeserialize for Cell {
+    fn try_deserialize(buf: &mut &[u8]) -> anchor_lang::Result<Self> {
+        if buf.len() < Cell::DISCRIMINATOR.len() {
+            return Err(
+                anchor_lang::error::ErrorCode::AccountDiscriminatorNotFound.into(),
+            );
+        }
+        let given_disc = &buf[..Cell::DISCRIMINATOR.len()];
+        if Cell::DISCRIMINATOR != given_disc {
+            return Err(
+                anchor_lang::error::Error::from(anchor_lang::error::AnchorError {
+                        error_name: anchor_lang::error::ErrorCode::AccountDiscriminatorMismatch
+                            .name(),
+                        error_code_number: anchor_lang::error::ErrorCode::AccountDiscriminatorMismatch
+                            .into(),
+                        error_msg: anchor_lang::error::ErrorCode::AccountDiscriminatorMismatch
+                            .to_string(),
+                        error_origin: Some(
+                            anchor_lang::error::ErrorOrigin::Source(anchor_lang::error::Source {
+                                filename: "src/lib.rs",
+                                line: 36u32,
+                            }),
+                        ),
+                        compared_values: None,
+                    })
+                    .with_account_name("Cell"),
+            );
+        }
+        Self::try_deserialize_unchecked(buf)
+    }
+    fn try_deserialize_unchecked(buf: &mut &[u8]) -> anchor_lang::Result<Self> {
+        let mut data: &[u8] = &buf[Cell::DISCRIMINATOR.len()..];
+        AnchorDeserialize::deserialize(&mut data)
+            .map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotDeserialize.into())
+    }
+}
+#[automatically_derived]
+impl anchor_lang::Discriminator for Cell {
+    const DISCRIMINATOR: &'static [u8] = &[105, 32, 243, 35, 201, 39, 164, 138];
+}
+#[automatically_derived]
+impl anchor_lang::Owner for Cell {
+    fn owner() -> Pubkey {
+        crate::ID
+    }
+}
+struct CellSystem {
+    a: bool,
+}
+impl borsh::ser::BorshSerialize for CellSystem
+where
+    bool: borsh::ser::BorshSerialize,
+{
+    fn serialize<W: borsh::maybestd::io::Write>(
+        &self,
+        writer: &mut W,
+    ) -> ::core::result::Result<(), borsh::maybestd::io::Error> {
+        borsh::BorshSerialize::serialize(&self.a, writer)?;
+        Ok(())
+    }
+}
+impl borsh::de::BorshDeserialize for CellSystem
+where
+    bool: borsh::BorshDeserialize,
+{
+    fn deserialize_reader<R: borsh::maybestd::io::Read>(
+        reader: &mut R,
+    ) -> ::core::result::Result<Self, borsh::maybestd::io::Error> {
+        Ok(Self {
+            a: borsh::BorshDeserialize::deserialize_reader(reader)?,
+        })
+    }
+}
+#[automatically_derived]
+impl ::core::clone::Clone for CellSystem {
+    #[inline]
+    fn clone(&self) -> CellSystem {
+        CellSystem {
+            a: ::core::clone::Clone::clone(&self.a),
+        }
+    }
+}
+#[automatically_derived]
+impl anchor_lang::AccountSerialize for CellSystem {
+    fn try_serialize<W: std::io::Write>(
+        &self,
+        writer: &mut W,
+    ) -> anchor_lang::Result<()> {
+        if writer.write_all(CellSystem::DISCRIMINATOR).is_err() {
+            return Err(anchor_lang::error::ErrorCode::AccountDidNotSerialize.into());
+        }
+        if AnchorSerialize::serialize(self, writer).is_err() {
+            return Err(anchor_lang::error::ErrorCode::AccountDidNotSerialize.into());
+        }
+        Ok(())
+    }
+}
+#[automatically_derived]
+impl anchor_lang::AccountDeserialize for CellSystem {
+    fn try_deserialize(buf: &mut &[u8]) -> anchor_lang::Result<Self> {
+        if buf.len() < CellSystem::DISCRIMINATOR.len() {
+            return Err(
+                anchor_lang::error::ErrorCode::AccountDiscriminatorNotFound.into(),
+            );
+        }
+        let given_disc = &buf[..CellSystem::DISCRIMINATOR.len()];
+        if CellSystem::DISCRIMINATOR != given_disc {
+            return Err(
+                anchor_lang::error::Error::from(anchor_lang::error::AnchorError {
+                        error_name: anchor_lang::error::ErrorCode::AccountDiscriminatorMismatch
+                            .name(),
+                        error_code_number: anchor_lang::error::ErrorCode::AccountDiscriminatorMismatch
+                            .into(),
+                        error_msg: anchor_lang::error::ErrorCode::AccountDiscriminatorMismatch
+                            .to_string(),
+                        error_origin: Some(
+                            anchor_lang::error::ErrorOrigin::Source(anchor_lang::error::Source {
+                                filename: "src/lib.rs",
+                                line: 39u32,
+                            }),
+                        ),
+                        compared_values: None,
+                    })
+                    .with_account_name("CellSystem"),
+            );
+        }
+        Self::try_deserialize_unchecked(buf)
+    }
+    fn try_deserialize_unchecked(buf: &mut &[u8]) -> anchor_lang::Result<Self> {
+        let mut data: &[u8] = &buf[CellSystem::DISCRIMINATOR.len()..];
+        AnchorDeserialize::deserialize(&mut data)
+            .map_err(|_| anchor_lang::error::ErrorCode::AccountDidNotDeserialize.into())
+    }
+}
+#[automatically_derived]
+impl anchor_lang::Discriminator for CellSystem {
+    const DISCRIMINATOR: &'static [u8] = &[102, 239, 92, 60, 229, 97, 95, 255];
+}
+#[automatically_derived]
+impl anchor_lang::Owner for CellSystem {
+    fn owner() -> Pubkey {
+        crate::ID
+    }
+}

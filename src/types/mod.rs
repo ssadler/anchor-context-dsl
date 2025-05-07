@@ -1,7 +1,5 @@
-
 use std::collections::HashMap;
 use syn::{spanned::Spanned, *};
-
 
 #[derive(Debug)]
 pub struct YamlDoc(pub YamlContexts, pub YamlAccounts);
@@ -13,8 +11,6 @@ pub type YamlAccounts = KeyedVec<DynStruct<ParseAccountProps>>;
 
 use crate::propsets::*;
 
-
-
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct AccountArg(pub syn::Ident);
 impl std::ops::Deref for AccountArg {
@@ -24,12 +20,10 @@ impl std::ops::Deref for AccountArg {
     }
 }
 
-
-
 #[derive(Debug, Clone)]
 pub struct PropLabel {
     pub label: &'static str,
-    pub path: syn::Path
+    pub path: syn::Path,
 }
 impl PropLabel {
     pub fn new_from_string(label: String, span: proc_macro2::Span) -> PropLabel {
@@ -50,7 +44,9 @@ impl PropLabel {
         self.path.span()
     }
 }
-impl<T> PartialEq<T> for PropLabel where T: ?Sized + AsRef<str>,
+impl<T> PartialEq<T> for PropLabel
+where
+    T: ?Sized + AsRef<str>,
 {
     fn eq(&self, other: &T) -> bool {
         self.label == other.as_ref()
@@ -68,9 +64,6 @@ impl From<proc_macro2::Ident> for PropLabel {
     }
 }
 
-
-
-
 #[derive(Debug, Clone)]
 pub struct LabelledProp<T>(pub PropLabel, pub T);
 impl<T> std::ops::Deref for LabelledProp<T> {
@@ -86,12 +79,19 @@ macro_rules! define_labelled_prop {
         pub struct $struct(pub LabelledProp<$type>);
         impl $struct {
             #[allow(dead_code)]
-            pub fn unwrap(self) -> LabelledProp<$type> { self.0 }
+            pub fn unwrap(self) -> LabelledProp<$type> {
+                self.0
+            }
         }
         impl std::ops::Deref for $struct {
             type Target = LabelledProp<$type>;
             fn deref(&self) -> &Self::Target {
                 &self.0
+            }
+        }
+        impl std::ops::DerefMut for $struct {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.0
             }
         }
         define_prop!($struct, $label);
@@ -109,24 +109,50 @@ define_labelled_prop!(TokenMint, "token :: mint", Expr);
 define_labelled_prop!(TokenAuthority, "token :: authority", Expr);
 define_labelled_prop!(TokenProgram, "token :: token_program", Expr);
 define_labelled_prop!(AssociatedTokenMint, "associated_token :: mint", Expr);
-define_labelled_prop!(AssociatedTokenAuthority, "associated_token :: authority", Expr);
-define_labelled_prop!(AssociatedTokenProgram, "associated_token :: token_program", Expr);
+define_labelled_prop!(
+    AssociatedTokenAuthority,
+    "associated_token :: authority",
+    Expr
+);
+define_labelled_prop!(
+    AssociatedTokenProgram,
+    "associated_token :: token_program",
+    Expr
+);
 define_labelled_prop!(MintAuthority, "mint :: authority", Expr);
 define_labelled_prop!(MintDecimals, "mint :: decimals", Expr);
 define_labelled_prop!(MintTokenProgram, "mint :: token_program", Expr);
-define_labelled_prop!(TransferHookAuthority, "extensions :: transfer_hook :: authority", Expr);
-define_labelled_prop!(TransferHookProgramId, "extensions :: transfer_hook :: program_id", Expr);
-define_labelled_prop!(InitIfNeeded, "init_if_needed", LitBool);
-
+define_labelled_prop!(
+    TransferHookAuthority,
+    "extensions :: transfer_hook :: authority",
+    Expr
+);
+define_labelled_prop!(
+    TransferHookProgramId,
+    "extensions :: transfer_hook :: program_id",
+    Expr
+);
 
 define_prop_set!(
     RealAccountPropsSansInit,
-    Boxed, ZeroCopy, Space, Check,
-    Constraints, AccountType, Seeds,
-    TokenMint, TokenAuthority, TokenProgram,
-    AssociatedTokenMint, AssociatedTokenAuthority, AssociatedTokenProgram,
-    MintAuthority, MintDecimals, MintTokenProgram,
-    TransferHookAuthority, TransferHookProgramId
+    Boxed,
+    ZeroCopy,
+    Space,
+    Check,
+    Constraints,
+    AccountType,
+    Seeds,
+    TokenMint,
+    TokenAuthority,
+    TokenProgram,
+    AssociatedTokenMint,
+    AssociatedTokenAuthority,
+    AssociatedTokenProgram,
+    MintAuthority,
+    MintDecimals,
+    MintTokenProgram,
+    TransferHookAuthority,
+    TransferHookProgramId
 );
 
 define_labelled_prop!(RealInit, "init", ());
@@ -137,13 +163,21 @@ define_labelled_prop!(Mut, "mut", ());
 define_labelled_prop!(Depends, "depends", Vec<Ident>);
 define_labelled_prop!(Init, "init", DynStruct<RealAccountPropsSansInit>);
 define_labelled_prop!(NoInit, "noinit", DynStruct<RealAccountPropsSansInit>);
-define_labelled_prop!(ConditionalProps, "if", AccountConditionalProps<RealAccountPropsSansInit>);
+define_labelled_prop!(InitIfNeeded, "init_if_needed", Option<DynStruct<RealAccountPropsSansInit>>);
+define_labelled_prop!(
+    ConditionalProps,
+    "if",
+    AccountConditionalProps<RealAccountPropsSansInit>
+);
 
 extend_set_RealAccountPropsSansInit!(
     ParseAccountProps,
-    Depends, Init, NoInit, InitIfNeeded, ConditionalProps
+    Depends,
+    Init,
+    NoInit,
+    InitIfNeeded,
+    ConditionalProps
 );
-
 
 /*
  * if <arg>: ...
@@ -153,32 +187,43 @@ extend_set_RealAccountPropsSansInit!(
 pub struct AccountConditionalProps<Set: PropSet> {
     pub arg: AccountArg,
     pub _if: DynStruct<Set>,
-    pub _else: DynStruct<Set>
+    pub _else: DynStruct<Set>,
 }
-
 
 #[derive(Clone, Debug)]
 pub enum ContextProp {
-    Instruction { args: Vec<syn::FnArg> },
-    Account { name: syn::Ident, args: Vec<AccountArg> }
+    Instruction {
+        args: Vec<syn::FnArg>,
+    },
+    Account {
+        name: syn::Ident,
+        args: Vec<AccountArg>,
+    },
 }
-
 
 #[derive(Debug, Default)]
 pub struct KeyedVec<T>(pub Vec<(Ident, T)>);
 impl<T> KeyedVec<T> {
-    pub fn new() -> Self { KeyedVec(vec![]) }
+    pub fn new() -> Self {
+        KeyedVec(vec![])
+    }
     pub fn has(&self, id: &Ident) -> bool {
-        self.iter().any(|(i,_)| i == id)
+        self.iter().any(|(i, _)| i == id)
     }
     pub fn get(&self, id: &Ident) -> Option<&T> {
         self.iter().find_map(|(i, t)| (id == i).then_some(t))
     }
     pub fn insert(&mut self, id: Ident, val: T) -> Result<()> {
-        if self.has(&id) { Err(parse_error!(id.span(), format!("KeyedVec insert already exists: {}", id))) }
-        else { Ok(self.0.push((id, val))) }
+        if self.has(&id) {
+            Err(parse_error!(
+                id.span(),
+                format!("KeyedVec insert already exists: {}", id)
+            ))
+        } else {
+            Ok(self.0.push((id, val)))
+        }
     }
-    pub fn iter(&self) -> impl Iterator<Item=&(Ident, T)> {
+    pub fn iter(&self) -> impl Iterator<Item = &(Ident, T)> {
         self.0.iter()
     }
 }
@@ -195,7 +240,6 @@ impl<T> IntoIterator for KeyedVec<T> {
     }
 }
 
-
 macro_rules! parse_error {
     ($span:expr, $msg:expr) => {
         syn::Error::new($span, $msg)
@@ -203,36 +247,35 @@ macro_rules! parse_error {
 }
 pub(crate) use parse_error;
 
-
-
-
 #[derive(Debug)]
 pub struct BuiltContexts(pub KeyedVec<BuiltContext>);
 #[derive(Debug)]
 pub struct BuiltContext {
     pub accounts: HashMap<Ident, BuiltAccount>,
-    pub instruction: Option<Vec<FnArg>>
+    pub instruction: Option<Vec<FnArg>>,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BuiltAccount(pub DynStruct<RealAccountProps>);
 impl std::ops::Deref for BuiltAccount {
     type Target = DynStruct<RealAccountProps>;
-    fn deref(&self) -> &Self::Target { &self.0 }
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 impl std::ops::DerefMut for BuiltAccount {
-    fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
 }
 
 impl BuiltAccount {
     pub fn is_token_2022(&self) -> bool {
         let tp2022 = syn::parse_quote! { token_program_2022 };
-        self.get().map(|AssociatedTokenProgram(p)| p.1 == tp2022) == Some(true) ||
-        self.get().map(|TokenProgram(p)|           p.1 == tp2022) == Some(true) ||
-        self.get().map(|MintTokenProgram(p)|       p.1 == tp2022) == Some(true)
+        self.get().map(|AssociatedTokenProgram(p)| p.1 == tp2022) == Some(true)
+            || self.get().map(|TokenProgram(p)| p.1 == tp2022) == Some(true)
+            || self.get().map(|MintTokenProgram(p)| p.1 == tp2022) == Some(true)
     }
     pub fn is_ro(&self) -> bool {
-        !self.has::<Mut>() &&
-        !self.get().map(|InitIfNeeded(p)| p.1.value()).unwrap_or_default() &&
-        !self.has::<RealInit>()
+        !self.has::<Mut>() && !self.has::<InitIfNeeded>() && !self.has::<RealInit>()
     }
 }

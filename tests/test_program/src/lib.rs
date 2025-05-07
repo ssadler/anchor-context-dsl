@@ -7,55 +7,35 @@ use anchor_yaml_accounts::*;
 use anchor_lang::prelude::*;
 
 
-// so $MYVIMRC
+#[anchor_context_dsl({
 
-yaml_contexts!({
-// YAML
+payer:
+  type: Signer<'info>
 
 quote_mint:
   type: Mint
   constraints:
     - quote_mint.freeze_authority.is_none()
-
-cell_quote_reserve:
-  depends:
-    - sys
-    - cell
-    - quote_mint
-  seeds: [b"cell_quote_reserve"] // , cell.key().as_ref(), quote_mint.key().as_ref()]
-  type: TokenAccount
-  token::mint: quote_mint
-  token::authority: sys
-
-sys:
-  seeds: [b"system"]
-  type: CellSystem
-
-cell:
-  type: Cell
-  boxed: true
-
   if init:
-    space: 10240
-    seeds: [b"cell", cell_id.to_le_bytes().as_ref()]
-  else:
-    seeds: [b"cell", cell.id.to_le_bytes().as_ref()]
+    space: 128
 
-//  noinit:
-//    mut: true
-//    constraints:
-//      - "quote_mint.key() == cell.get_quote_asset().expect(\"cell not tradeable\")"
-//
-context Thingy:
-  cell_quote_reserve
+})]
+mod contexts {
+    use super::*;
 
-// END
-});
+    #[context]
+    pub struct Thingy<'info> {
+        #[account(mut)]
+        pub payer: Signer<'info>,
+        #[account(init)]
+        pub quote_mint: Account<'info, Mint>,
+    }
+}
+use contexts::*;
 
 #[account]
 struct Cell { id: u32 }
 
 #[account]
 struct CellSystem { a: bool }
-
 

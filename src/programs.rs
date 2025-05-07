@@ -1,27 +1,20 @@
-
 use std::collections::HashMap;
 
-use crate::types::*;
 use crate::propsets::*;
+use crate::types::*;
 use syn::*;
 
-
-
 pub fn add_programs_to_context(accounts: &mut HashMap<Ident, BuiltAccount>) {
-
     let mut sys = false;
     let mut token = false;
     let mut token2022 = false;
     let mut ata = false;
 
     for (_, acc) in accounts.iter() {
-
-        let init = acc.has::<RealInit>() ||
-            acc.get::<InitIfNeeded>().map(|i| i.1.value()).unwrap_or_default();
+        let init = acc.has::<RealInit>() || acc.has::<InitIfNeeded>();
         sys |= init;
 
         let is_mut = acc.has::<Mut>();
-
 
         if init || is_mut {
             ata |= acc.has::<AssociatedTokenMint>();
@@ -61,7 +54,7 @@ pub fn add_programs_to_context(accounts: &mut HashMap<Ident, BuiltAccount>) {
                 .or_insert(BuiltAccount(account));
         };
     }
-    
+
     if sys {
         add_account!("system_program", Program<'info, System>);
         let _mut = Mut(LabelledProp(PropLabel::from_str("mut", span), ()));
